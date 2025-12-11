@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import os
 import psycopg2
-import psycopg2.extras
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import openai
 import json
@@ -26,10 +26,17 @@ DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 DEEPSEEK_BASE_URL = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
 
 # Initialize OpenAI client for DeepSeek
-client = openai.OpenAI(
-    api_key=DEEPSEEK_API_KEY,
-    base_url=DEEPSEEK_BASE_URL
-)
+client = None
+if DEEPSEEK_API_KEY:
+    try:
+        client = openai.OpenAI(
+            api_key=DEEPSEEK_API_KEY,
+            base_url=DEEPSEEK_BASE_URL
+        )
+    except Exception as e:
+        print(f"Failed to initialize DeepSeek client: {e}")
+else:
+    print("Warning: DEEPSEEK_API_KEY not configured")
 
 def get_db_connection():
     """Create database connection"""
@@ -38,14 +45,16 @@ def get_db_connection():
         port=DB_PORT,
         dbname=DB_NAME,
         user=DB_USER,
-        password=DB_PASSWORD
+        password=DB_PASSWORD,
+        client_encoding='utf8',
+        options='-c client_encoding=utf8'
     )
     return conn
 
 def find_similar_cases(current_findings, limit=5):
     """Find similar cases based on findings summary"""
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.RealDictCursor)
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     # Get all existing studies
     cursor.execute("""
@@ -89,6 +98,14 @@ def find_similar_cases(current_findings, limit=5):
 
 def get_triage_recommendation(current_study, similar_cases):
     """Get AI triage recommendation from DeepSeek"""
+
+    # Check if client is available
+    if not client:
+        return {
+            "triage_level": "MEDIUM",
+            "triage_score": 0.5,
+            "explanation": "DeepSeek API client not initialized. Please check API configuration."
+        }
 
     # Prepare context for AI
     context = f"""
@@ -169,7 +186,7 @@ Response format:
 def index():
     """Main page with studies list"""
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.RealDictCursor)
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     # Get all studies
     cursor.execute("""
@@ -189,7 +206,7 @@ def index():
 def study_detail(study_id):
     """Study detail page"""
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.RealDictCursor)
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     # Get current study
     cursor.execute("""
@@ -229,7 +246,7 @@ def study_detail(study_id):
 def triage_study(study_id):
     """Perform AI triage on study"""
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.RealDictCursor)
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
 
     # Get current study
     cursor.execute("""

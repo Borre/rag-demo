@@ -1,25 +1,27 @@
 version: '3.8'
 
 services:
-  n8n:
-    image: docker.n8n.io/n8nio/n8n
-    container_name: n8n
+  # Flask Application
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: radiology_triage_app
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "5000:5000"
     environment:
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-America/Santiago}
-      - TZ=${TZ:-America/Santiago}
-      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-      - N8N_RUNNERS_ENABLED=true
-      - N8N_SECURE_COOKIE=false
-      - DB_SQLITE_POOL_SIZE=10
-      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
-      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-postgres}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - PYTHONIOENCODING=utf-8
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
     volumes:
-      - n8n_data:/home/node/.n8n
-    stdin_open: true
-    tty: true
-
-volumes:
-  n8n_data:
-    driver: local
+      - ./app.py:/app/app.py
+      - ./templates:/app/templates
+      - ./.env:/app/.env
