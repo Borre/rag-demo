@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, jsonify
+from flask_talisman import Talisman
 import os
+import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
@@ -10,9 +12,48 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# Configure logging to reduce noise
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
 load_dotenv()
 
 app = Flask(__name__)
+
+# Security headers with CSP for CDNs
+CSP = {
+    'default-src': "'self'",
+    'script-src': [
+        "'self'",
+        'https://cdn.jsdelivr.net',
+        'https://stackpath.bootstrapcdn.com'
+    ],
+    'style-src': [
+        "'self'",
+        'https://cdn.jsdelivr.net',
+        'https://stackpath.bootstrapcdn.com',
+        "'unsafe-inline'"
+    ],
+    'font-src': [
+        "'self'",
+        'https://cdn.jsdelivr.net'
+    ],
+    'img-src': [
+        "'self'",
+        'data:',
+        'https:'
+    ]
+}
+
+# Comment out Talisman for now to avoid CSS issues
+# Talisman(app, force_https=False, strict_transport_security=False, content_security_policy=CSP)
+
+# Basic security headers
+@app.after_request
+def after_request(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
 
 # Database configuration
 DB_HOST = os.getenv('DB_HOST', 'localhost')
