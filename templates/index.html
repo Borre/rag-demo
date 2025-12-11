@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-clipboard-data me-2"></i>Imaging Studies</h1>
+            <span class="badge bg-info">{{ studies|length }} Total Studies</span>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search studies...">
+                    </div>
+                    <div class="col-md-2">
+                        <select id="modalityFilter" class="form-select">
+                            <option value="">All Modalities</option>
+                            <option value="CT">CT</option>
+                            <option value="MRI">MRI</option>
+                            <option value="XR">XR</option>
+                            <option value="US">US</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="statusFilter" class="form-select">
+                            <option value="">All Status</option>
+                            <option value="NEW">NEW</option>
+                            <option value="REPORTED">REPORTED</option>
+                            <option value="IN_REVIEW">IN_REVIEW</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select id="priorityFilter" class="form-select">
+                            <option value="">All Priorities</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-secondary w-100" onclick="resetFilters()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Studies Grid -->
+        <div id="studiesContainer" class="row">
+            {% for study in studies %}
+            <div class="col-lg-6 col-xl-4 mb-3 study-item"
+                 data-modality="{{ study.modality }}"
+                 data-status="{{ study.current_status }}"
+                 data-priority="{{ study.priority_flag or 'UNSET' }}"
+                 data-search="{{ study.study_id }} {{ study.patient_id }} {{ study.indication }} {{ study.findings_summary or '' }}">
+                <div class="card study-card h-100 priority-{{ (study.priority_flag or 'medium').lower() }}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span class="badge bg-primary">{{ study.modality }}</span>
+                        {% if study.priority_flag %}
+                            <span class="badge badge-{{ study.priority_flag.lower() }}">{{ study.priority_flag }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h6 class="card-title">{{ study.study_id }}</h6>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                <i class="bi bi-person me-1"></i>{{ study.patient_id }}<br>
+                                <i class="bi bi-body me-1"></i>{{ study.body_part }}<br>
+                                <i class="bi bi-hospital me-1"></i>{{ study.site }}<br>
+                                <i class="bi bi-clock me-1"></i>{{ study.exam_datetime.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </p>
+                        <p class="card-text">
+                            <strong>Indication:</strong><br>
+                            <small>{{ study.indication[:100] }}{% if study.indication|length > 100 %}...{% endif %}</small>
+                        </p>
+                        {% if study.findings_summary %}
+                        <p class="card-text">
+                            <strong>Findings:</strong><br>
+                            <small>{{ study.findings_summary[:100] }}{% if study.findings_summary|length > 100 %}...{% endif %}</small>
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge bg-secondary">{{ study.current_status }}</span>
+                            <a href="{{ url_for('study_detail', study_id=study.study_id) }}"
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye me-1"></i>View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if studies|length == 0 %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <h3 class="mt-3 text-muted">No studies found</h3>
+            <p class="text-muted">Check back later for new imaging studies.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Search and filter functionality
+document.getElementById('searchInput').addEventListener('input', filterStudies);
+document.getElementById('modalityFilter').addEventListener('change', filterStudies);
+document.getElementById('statusFilter').addEventListener('change', filterStudies);
+document.getElementById('priorityFilter').addEventListener('change', filterStudies);
+
+function filterStudies() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const modalityFilter = document.getElementById('modalityFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const priorityFilter = document.getElementById('priorityFilter').value;
+
+    const studies = document.querySelectorAll('.study-item');
+    let visibleCount = 0;
+
+    studies.forEach(study => {
+        const matchesSearch = !searchTerm ||
+            study.dataset.search.toLowerCase().includes(searchTerm);
+        const matchesModality = !modalityFilter ||
+            study.dataset.modality === modalityFilter;
+        const matchesStatus = !statusFilter ||
+            study.dataset.status === statusFilter;
+        const matchesPriority = !priorityFilter ||
+            study.dataset.priority === priorityFilter;
+
+        if (matchesSearch && matchesModality && matchesStatus && matchesPriority) {
+            study.style.display = '';
+            visibleCount++;
+        } else {
+            study.style.display = 'none';
+        }
+    });
+
+    // Update visible count
+    const countBadge = document.querySelector('.badge.bg-info');
+    countBadge.textContent = `${visibleCount} of {{ studies|length }} Studies`;
+}
+
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('modalityFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('priorityFilter').value = '';
+    filterStudies();
+}
+
+// Auto-refresh every 5 minutes
+setInterval(() => {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

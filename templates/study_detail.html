@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}{{ study.study_id }} - Radiology Triage{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary mb-3">
+            <i class="bi bi-arrow-left me-1"></i>Back to Studies
+        </a>
+
+        <!-- Study Details Card -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-clipboard-pulse me-2"></i>{{ study.study_id }}
+                </h4>
+                <div>
+                    <span class="badge bg-primary me-2">{{ study.modality }}</span>
+                    <span class="badge bg-secondary">{{ study.current_status }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Study Information</h5>
+                        <table class="table table-sm">
+                            <tr><td><strong>Patient ID:</strong></td><td>{{ study.patient_id }}</td></tr>
+                            <tr><td><strong>Modality:</strong></td><td>{{ study.modality }}</td></tr>
+                            <tr><td><strong>Body Part:</strong></td><td>{{ study.body_part }}</td></tr>
+                            <tr><td><strong>Site:</strong></td><td>{{ study.site }}</td></tr>
+                            <tr><td><strong>Exam Date:</strong></td><td>{{ study.exam_datetime.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+                            <tr><td><strong>SLA (seconds):</strong></td><td>{{ study.sla_seconds or 'N/A' }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Clinical Information</h5>
+                        <p><strong>Indication:</strong></p>
+                        <p class="text-muted">{{ study.indication }}</p>
+
+                        {% if existing_triage %}
+                        <div class="alert alert-info mt-3">
+                            <h6><i class="bi bi-info-circle me-1"></i>Previous AI Triage</h6>
+                            <p class="mb-1"><strong>Level:</strong>
+                                <span class="badge badge-{{ existing_triage.triage_level.lower() }}">
+                                    {{ existing_triage.triage_level }}
+                                </span>
+                            </p>
+                            <p class="mb-1"><strong>Score:</strong> {{ "%.2f"|format(existing_triage.triage_score) }}</p>
+                            <small>{{ existing_triage.ai_explanation }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <h5>Findings</h5>
+                    {% if study.findings_summary %}
+                        <p class="text-muted">{{ study.findings_summary }}</p>
+                    {% else %}
+                        <p class="text-muted"><em>No findings summary available</em></p>
+                    {% endif %}
+                </div>
+
+                {% if study.report_text %}
+                <div class="mt-3">
+                    <h5>Full Report</h5>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p class="mb-0">{{ study.report_text }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <button id="triageBtn" class="btn btn-primary" onclick="performTriage()">
+                    <i class="bi bi-robot me-1"></i>AI Triage Analysis
+                </button>
+            </div>
+        </div>
+
+        <!-- Similar Cases Card -->
+        {% if similar_cases %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-collection me-2"></i>Similar Historical Cases
+                    <span class="badge bg-secondary ms-2">{{ similar_cases|length }} cases found</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Study ID</th>
+                                <th>Modality</th>
+                                <th>Body Part</th>
+                                <th>Indication</th>
+                                <th>Findings Summary</th>
+                                <th>Priority</th>
+                                <th>Similarity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for case in similar_cases %}
+                            <tr>
+                                <td>
+                                    <a href="#" class="text-decoration-none">
+                                        {{ case.study_id }}
+                                        <small class="d-block text-muted">{{ case.exam_datetime.strftime('%Y-%m-%d') }}</small>
+                                    </a>
+                                </td>
+                                <td><span class="badge bg-primary">{{ case.modality }}</span></td>
+                                <td>{{ case.body_part }}</td>
+                                <td>{{ case.indication[:50] }}{% if case.indication|length > 50 %}...{% endif %}</td>
+                                <td>{{ case.findings_summary[:80] }}{% if case.findings_summary|length > 80 %}...{% endif %}</td>
+                                <td>
+                                    {% if case.priority_flag %}
+                                        <span class="badge badge-{{ case.priority_flag.lower() }}">{{ case.priority_flag }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Not set</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar" role="progressbar"
+                                             style="width: {{ (case.similarity_score * 100)|round }}%"
+                                             aria-valuenow="{{ (case.similarity_score * 100)|round }}"
+                                             aria-valuemin="0" aria-valuemax="100">
+                                            {{ "%.1f"|format(case.similarity_score * 100) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Triage Results (hidden initially) -->
+        <div id="triageResults" class="card" style="display: none;">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle me-2"></i>AI Triage Analysis Complete
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h2 id="triageLevel" class="display-4"></h2>
+                            <p class="text-muted">Triage Level</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h2 id="triageScore" class="display-4"></h2>
+                            <p class="text-muted">Priority Score</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <div id="scoreGauge"></div>
+                            <p class="text-muted">Risk Assessment</p>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h6>AI Explanation:</h6>
+                <p id="triageExplanation" class="text-muted"></p>
+                <div class="mt-3">
+                    <button class="btn btn-outline-secondary" onclick="scrollToSimilarCases()">
+                        <i class="bi bi-collection me-1"></i>View Similar Cases
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary ms-2">
+                        <i class="bi bi-arrow-left me-1"></i>Back to All Studies
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function performTriage() {
+    const btn = document.getElementById('triageBtn');
+    const originalText = btn.innerHTML;
+    showLoading(btn);
+
+    try {
+        const response = await fetch(`/triage/{{ study.study_id }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Display results
+            displayTriageResults(data.triage);
+            showAlert('Triage analysis completed successfully!', 'success');
+        } else {
+            showAlert('Error: ' + data.error, 'danger');
+        }
+    } catch (error) {
+        showAlert('Network error: ' + error.message, 'danger');
+    } finally {
+        hideLoading(btn, originalText);
+    }
+}
+
+function displayTriageResults(triage) {
+    const resultsDiv = document.getElementById('triageResults');
+    const levelDiv = document.getElementById('triageLevel');
+    const scoreDiv = document.getElementById('triageScore');
+    const explanationDiv = document.getElementById('triageExplanation');
+
+    // Set triage level with appropriate color
+    levelDiv.textContent = triage.triage_level;
+    levelDiv.className = 'display-4 text-' + getTriageColor(triage.triage_level);
+
+    // Set score
+    scoreDiv.textContent = parseFloat(triage.triage_score).toFixed(2);
+
+    // Set explanation
+    explanationDiv.textContent = triage.explanation;
+
+    // Create simple gauge
+    createScoreGauge(triage.triage_score);
+
+    // Show results
+    resultsDiv.style.display = 'block';
+    resultsDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+function getTriageColor(level) {
+    switch (level.toUpperCase()) {
+        case 'HIGH': return 'danger';
+        case 'MEDIUM': return 'warning';
+        case 'LOW': return 'success';
+        default: return 'secondary';
+    }
+}
+
+function createScoreGauge(score) {
+    const gauge = document.getElementById('scoreGauge');
+    const percentage = Math.round(score * 100);
+    const color = score > 0.7 ? 'danger' : score > 0.4 ? 'warning' : 'success';
+
+    gauge.innerHTML = `
+        <div class="progress" style="height: 30px;">
+            <div class="progress-bar bg-${color}" role="progressbar"
+                 style="width: ${percentage}%"
+                 aria-valuenow="${percentage}"
+                 aria-valuemin="0" aria-valuemax="100">
+                ${percentage}%
+            </div>
+        </div>
+    `;
+}
+
+function scrollToSimilarCases() {
+    document.querySelector('.card:nth-of-type(3)').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: radiology_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Flask Application
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: radiology_triage_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./app.py:/app/app.py
+      - ./templates:/app/templates
+      - ./.env:/app/.env
+
+  # N8N Workflow Automation
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-America/Santiago}
+      - TZ=${TZ:-America/Santiago}
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_SECURE_COOKIE=false
+      - DB_SQLITE_POOL_SIZE=10
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_GIT_NODE_DISABLE_BARE_REPOS=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+    driver: local
+  n8n_data:
+    driver: local
