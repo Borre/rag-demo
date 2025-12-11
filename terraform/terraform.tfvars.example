@@ -1,0 +1,41 @@
+# Huawei Cloud Configuration
+huawei_region        = "cn-north-4"
+huawei_access_key    = "your_access_key_here"
+huawei_secret_key    = "your_secret_key_here"
+
+# Project Configuration
+project_name         = "radiology-ai"
+environment          = "prod"
+
+# Network Configuration
+vpc_cidr            = "192.168.0.0/16"
+subnet_cidr         = "192.168.1.0/24"
+availability_zone   = "cn-north-4a"
+
+# ECS Configuration
+ecs_image_name      = "Standard_Ubuntu_20.04_latest"
+ecs_flavor          = "s6.large.2"
+eip_bandwidth       = 5
+
+# SSH Configuration
+ssh_public_key      = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
+ssh_private_key     = "-----BEGIN OPENSSH PRIVATE KEY-----\n..."
+ssh_allowed_ips     = "0.0.0.0/0"
+
+# Application Configuration
+deploy_n8n          = false
+n8n_allowed_ips     = "0.0.0.0/0"
+
+# Database Configuration
+db_host            = "your-rds-endpoint.rds.huaweicloud.com"
+db_port            = 5432
+db_name            = "radiology_db"
+db_user            = "postgres"
+db_password        = "your_db_password"
+
+# DeepSeek API Configuration
+deepseek_api_key    = "sk-your-deepseek-api-key"
+deepseek_base_url   = "https://api.deepseek.com"
+
+# Monitoring
+alarm_notification_email = "admin@yourdomain.com"
